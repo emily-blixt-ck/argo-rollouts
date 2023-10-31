@@ -11,6 +11,7 @@ import {faChartBar, faChevronCircleDown, faChevronCircleUp, faUndoAlt} from '@fo
 import {Button, Tooltip} from 'antd';
 import moment = require('moment');
 import {InfoItemProps, InfoItemRow} from '../info-item/info-item';
+import {AnalysisModal} from '../analysis-modal';
 
 function formatTimestamp(ts: string): string {
     const inputFormat = 'YYYY-MM-DD HH:mm:ss Z z';
@@ -98,6 +99,7 @@ export const RevisionWidget = (props: RevisionWidgetProps) => {
 const AnalysisRunWidget = (props: {analysisRuns: RolloutAnalysisRunInfo[]}) => {
     const {analysisRuns} = props;
     const [selection, setSelection] = React.useState<RolloutAnalysisRunInfo>(null);
+    const [selectedAnalysis, setSelectedAnalysis] = React.useState<RolloutAnalysisRunInfo>(null);
 
     return (
         <div className='analysis'>
@@ -128,7 +130,7 @@ const AnalysisRunWidget = (props: {analysisRuns: RolloutAnalysisRunInfo[]}) => {
                                 className={`analysis__runs-action ${
                                     ar.status === 'Running' ? 'analysis--pending' : ar.status === 'Successful' ? 'analysis--success' : 'analysis--failure'
                                 }`}>
-                                <Button onClick={() => (selection?.objectMeta.name === ar.objectMeta.name ? setSelection(null) : setSelection(ar))}>
+                                <Button onClick={() => (selectedAnalysis?.objectMeta.name === ar.objectMeta.name ? setSelectedAnalysis(null) : setSelectedAnalysis(ar))}>
                                     {`Analysis ${temp[len - 2] + '-' + temp[len - 1]}`}
                                 </Button>
                             </div>
@@ -136,6 +138,8 @@ const AnalysisRunWidget = (props: {analysisRuns: RolloutAnalysisRunInfo[]}) => {
                     );
                 })}
             </div>
+
+            {selectedAnalysis !== null && <AnalysisModal analysis={selectedAnalysis} open={selectedAnalysis !== null} onClose={() => setSelectedAnalysis(null)} />}
 
             {selection && (
                 <React.Fragment key={selection.objectMeta?.name}>
