@@ -25,25 +25,32 @@ const timeRangeFormatter = (start: number, end: number | null) => {
 interface AnalysisPanelProps {
     className?: string[] | string;
     endTime: number | null;
-    image?: string;
+    images: string[];
     message?: string;
+    revision: string;
     startTime: number | null;
     status: AnalysisStatus;
     substatus?: FunctionalStatus.ERROR | FunctionalStatus.WARNING;
     title: string;
 }
 
-const AnalysisPanel = ({className, endTime, image, message, startTime, status, substatus, title}: AnalysisPanelProps) => (
+const AnalysisPanel = ({className, endTime, images, message, revision, startTime, status, substatus, title}: AnalysisPanelProps) => (
     <div className={cx(className)}>
         <Header className={cx('analysis-header')} title={title} status={status} substatus={substatus} />
-        {image !== undefined && (
+        {images.length > 0 && (
             <div className={cx('summary-section')}>
                 <Text className={cx('label')} strong>
-                    Version
+                    {images.length > 1 ? `Versions` : `Version`}
                 </Text>
-                <Text>{image}</Text>
+                <Text>{images.join(', ')}</Text>
             </div>
         )}
+        <div className={cx('summary-section')}>
+            <Text className={cx('label')} strong>
+                Revision
+            </Text>
+            <Text>{revision}</Text>
+        </div>
         {startTime !== null && (
             <div className={cx('summary-section')}>
                 <Text className={cx('label')} strong>

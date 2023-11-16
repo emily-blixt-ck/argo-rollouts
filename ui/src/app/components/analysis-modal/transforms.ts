@@ -67,9 +67,56 @@ export const argValue = (args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alp
 
 /**
  *
+ * @param providerInfo metric provider object
+ * @returns first key in the provider object
+ */
+const metricProvider = (providerInfo: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider): string => Object.keys(providerInfo)?.[0] ?? 'unsupported provider';
+
+const PROVIDER_CONDITION_SUPPORT: {
+    [key: string]: (resultAccessor: string) => {
+        isFormatSupported: boolean;
+        conditionKey: string | null;
+    };
+} = {
+    prometheus: (resultAccessor: string) => ({
+        isFormatSupported: resultAccessor === 'result[0]',
+        conditionKey: '0',
+    }),
+    datadog: (resultAccessor: string) => ({
+        isFormatSupported: ['result', 'default(result, 0)'].includes(resultAccessor),
+        conditionKey: resultAccessor.includes('0') ? '0' : null,
+    }),
+    wavefront: (resultAccessor: string) => ({
+        isFormatSupported: resultAccessor === 'result',
+        conditionKey: null,
+    }),
+    newRelic: (resultAccessor: string) => ({
+        isFormatSupported: resultAccessor.startsWith('result.'),
+        conditionKey: resultAccessor.substring(7),
+    }),
+    cloudWatch: (resultAccessor: string) => ({
+        isFormatSupported: false,
+        conditionKey: null,
+    }),
+    graphite: (resultAccessor: string) => ({
+        isFormatSupported: resultAccessor === 'result[0]',
+        conditionKey: '0',
+    }),
+    influxdb: (resultAccessor: string) => ({
+        isFormatSupported: resultAccessor === 'result[0]',
+        conditionKey: '0',
+    }),
+    skywalking: (resultAccessor: string) => ({
+        isFormatSupported: false,
+        conditionKey: null,
+    }),
+};
+
+/**
+ *
  * @param condition failure_condition or success_condition with the format
- * result.[name] [operator] {{ args.[argname] }}
- * or result.name [operator] [value]
+ * [result accessor] [operator] {{ args.[argname] }}
+ * or [result accessor] [operator] [value]
  * @param args arguments name/value pairs associated with the analysis run
  * @returns
  * label - a friendly fail/success condition label and
@@ -78,13 +125,14 @@ export const argValue = (args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alp
  */
 export const conditionDetails = (
     condition?: string,
-    args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Argument[] = []
+    args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Argument[] = [],
+    provider?: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider
 ): {
     label: string | null;
     thresholds: number[];
     conditionKeys: string[];
 } => {
-    if (condition === undefined || condition === '') {
+    if (condition === undefined || condition === '' || provider === undefined || metricProvider(provider) === undefined) {
         return {
             label: null,
             thresholds: [],
@@ -92,25 +140,32 @@ export const conditionDetails = (
         };
     }
 
-    const conditionLabel = interpolateQuery(condition, args);
+    const interpolatedCondition = interpolateQuery(condition, args);
+    const subconditions = interpolatedCondition.split(/ && | \|\| /);
 
-    // find keys and any pieces of the condition that can be converted to a number (for a value threshold
-    // that can be added to a chart)
+    const providerType = metricProvider(provider);
     const thresholds: number[] = [];
     const conditionKeys: string[] = [];
-    const transformedParts = conditionLabel.split(' ');
-    transformedParts.forEach((conditionPart) => {
-        if (conditionPart.startsWith('result.')) {
-            conditionKeys.push(conditionPart.substring(7));
-        } else if (conditionPart.startsWith('result[')) {
-            conditionKeys.push(conditionPart.substring(7, conditionPart.length - 1));
-        } else if (!isNaN(Number(conditionPart))) {
-            thresholds.push(Number(conditionPart));
+
+    // for each subcondition, if it deemed to be a supported subcondition, add keys and numeric thresholds
+    subconditions.forEach((subcondition) => {
+        const subconditionParts = subcondition.split(' ');
+        if (subconditionParts.length === 3) {
+            const {isFormatSupported, conditionKey} = PROVIDER_CONDITION_SUPPORT[providerType]?.(subconditionParts[0].trim());
+            const isUnderOverThreshold = subconditionParts[1].includes('<') || subconditionParts[1].includes('>');
+            const isChartableThreshold = isFiniteNumber(parseFloat(subconditionParts[2]));
+
+            if (isFormatSupported && isUnderOverThreshold && isChartableThreshold) {
+                if (conditionKey !== null) {
+                    conditionKeys.push(conditionKey);
+                }
+                thresholds.push(Number(subconditionParts[2]));
+            }
         }
     });
 
     return {
-        label: conditionLabel,
+        label: interpolatedCondition,
         thresholds,
         conditionKeys,
     };
@@ -155,9 +210,9 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
 
         if (metricSpec !== undefined) {
             // spec values
-            const failConditionInfo = conditionDetails(metricSpec.failureCondition, spec.args);
+            const failConditionInfo = conditionDetails(metricSpec.failureCondition, spec.args, metricSpec.provider);
             const failThresholds = failConditionInfo.thresholds.length > 0 ? formatThresholdsForChart(failConditionInfo.thresholds) : null;
-            const successConditionInfo = conditionDetails(metricSpec.successCondition, spec.args);
+            const successConditionInfo = conditionDetails(metricSpec.successCondition, spec.args, metricSpec.provider);
             const successThresholds = successConditionInfo.thresholds.length > 0 ? formatThresholdsForChart(successConditionInfo.thresholds) : null;
 
             // value keys are needed for measurement values formatted as {key1: value1, key2: value2}
@@ -169,7 +224,7 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
                 name: metricName,
                 spec: {
                     ...metricSpec,
-                    query: metricQuery(metricSpec.provider, spec.args),
+                    queries: metricQueries(metricSpec.provider, spec.args),
                     failConditionLabel: failConditionInfo.label,
                     failThresholds,
                     successConditionLabel: successConditionInfo.label,
@@ -198,7 +253,6 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
             };
         }
     });
-    // TODO: SHOW SOMETHING WITH NO RESULTS
 
     return transformedMetrics;
 };
@@ -229,13 +283,10 @@ export const metricSubstatus = (status: AnalysisStatus, failures: number, errors
             }
             return undefined;
         default:
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-case-declarations
-            // const impossible: never = status;
             return undefined;
     }
 };
 
-// todo: we might want to include the message in here to go along with a failure message
 /**
  *
  * @param status analysis metric status
@@ -277,8 +328,6 @@ export const metricStatusLabel = (status: AnalysisStatus, failures: number, erro
             }
             return `Analysis passed ${extraDetails}`.trim();
         default:
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-case-declarations
-            // const impossible: never = status;
             return '';
     }
 };
@@ -312,47 +361,58 @@ export const interpolateQuery = (query?: string, args?: GithubComArgoprojArgoRol
  * @param args arguments name/value pairs associated with the analysis run
  * @returns query formatted for display or undefined
  */
-export const metricQuery = (
+export const metricQueries = (
     provider?: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider | null,
     args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Argument[] = []
-): string | undefined => {
-    if (provider === undefined) {
+): string[] | undefined => {
+    if (provider === undefined || provider === null) {
         return undefined;
     }
-    if ('prometheus' in provider) {
-        return interpolateQuery(provider.prometheus.query, args);
-    }
-    if ('datadog' in provider) {
-        if ((provider.datadog.apiVersion ?? '').toLowerCase() === 'v1' && 'query' in provider.datadog) {
-            return interpolateQuery(provider.datadog.query, args);
-        }
-        if ((provider.datadog.apiVersion ?? '').toLowerCase() === 'v2') {
-            if ('query' in provider.datadog) {
+    const providerType = metricProvider(provider);
+    switch (providerType) {
+        case 'prometheus':
+            return [interpolateQuery(provider.prometheus.query, args)];
+        case 'datadog':
+            if ((provider.datadog.apiVersion ?? '').toLowerCase() === 'v1' && 'query' in provider.datadog) {
+                return [interpolateQuery(provider.datadog.query, args)];
             }
-            if ('queries' in provider.datadog) {
+            if ((provider.datadog.apiVersion ?? '').toLowerCase() === 'v2') {
+                if ('query' in provider.datadog) {
+                    if ('formula' in provider.datadog) {
+                        return [
+                            `query: ${provider.datadog.query}, 
+                            formula: ${provider.datadog.formula}`,
+                        ];
+                    }
+                    return [interpolateQuery(provider.datadog.query, args)];
+                }
+                if ('queries' in provider.datadog) {
+                    if ('fomula' in provider.datadog) {
+                        return [
+                            `queries: ${provider.datadog.queries}, 
+                            formula: ${provider.datadog.formula}`,
+                        ];
+                    }
+                    return Object.values(provider.datadog.queries).map((query) => interpolateQuery(query, args));
+                }
             }
-        }
+            return undefined;
+        case 'wavefront':
+            return [interpolateQuery(provider.wavefront.query, args)];
+        case 'newRelic':
+            return [interpolateQuery(provider.newRelic.query, args)];
+        case 'cloudWatch':
+            return Array.isArray(provider.cloudWatch.metricDataQueries) ? provider.cloudWatch.metricDataQueries.map((query) => JSON.stringify(query)) : undefined;
+        case 'graphite':
+            return [interpolateQuery(provider.graphite.query, args)];
+        case 'influxdb':
+            return [interpolateQuery(provider.influxdb.query, args)];
+        case 'skywalking':
+            return [interpolateQuery(provider.skywalking.query, args)];
+        // not currently supported: kayenta, web, job, plugin
+        default:
+            return undefined;
     }
-    if ('wavefront' in provider) {
-        return interpolateQuery(provider.wavefront.query, args);
-    }
-    if ('newRelic' in provider) {
-        return interpolateQuery(provider.newRelic.query, args);
-    }
-    if ('cloudWatch' in provider) {
-        // has queries - show all
-    }
-    if ('graphite' in provider) {
-        return interpolateQuery(provider.graphite.query, args);
-    }
-    if ('influxdb' in provider) {
-        return interpolateQuery(provider.influxdb.query, args);
-    }
-    if ('skywalking' in provider) {
-        return interpolateQuery(provider.skywalking.query, args);
-    }
-    // not currently supported: kayenta, web, job, plugin
-    return undefined;
 };
 
 // Measurement Utils
@@ -361,7 +421,7 @@ export const metricQuery = (
  *
  * @param conditionKeys keys from success/fail conditions used in some cases to pull values from the measurement result
  * @param measurements array of metric measurements
- * @returns
+ * @returns formatted measurement values and chart information if the metric can be charted
  */
 export const transformMeasurements = (conditionKeys: string[], measurements?: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Measurement[]): MeasurementInfo => {
     if (measurements === undefined || measurements.length === 0) {
@@ -403,14 +463,14 @@ export const transformMeasurements = (conditionKeys: string[], measurements?: Gi
 /**
  *
  * @param value value to check for chartability
- * @returns whether the data point can be added to a line chart
+ * @returns whether the data point can be added to a line chart (number or null)
  */
 const isChartable = (value: any): boolean => isFiniteNumber(value) || value === null;
 
 /**
  *
  * @param value value to display
- * @returns value formatted for display
+ * @returns value formatted for display purposes
  */
 const formattedValue = (value: any): number | null | string => {
     const isNum = isFiniteNumber(value);
@@ -422,7 +482,7 @@ const formattedValue = (value: any): number | null | string => {
  *
  * @param conditionKeys keys from success/fail conditions used in some cases to pull values from the measurement result
  * @param value measurement value returned by provider
- * @returns
+ * @returns chart and table data along with a flag indicating whether the measurement value can be charted
  */
 const transformMeasurementValue = (
     conditionKeys: string[],
@@ -432,7 +492,6 @@ const transformMeasurementValue = (
     chartValue?: TransformedValueObject | number | string | null;
     tableValue: TransformedValueObject | number | string | null;
 } => {
-    // returns null
     if (value === undefined || value === '') {
         return {
             canChart: true,
@@ -443,8 +502,7 @@ const transformMeasurementValue = (
 
     const parsedValue = JSON.parse(value);
 
-    // (1) supports format 4 or 4.05
-    // returns rounded number
+    // supports a format like 4 or 4.05 (returned as rounded number)
     if (isFiniteNumber(parsedValue)) {
         const displayValue = formattedValue(parsedValue);
         return {
@@ -454,13 +512,12 @@ const transformMeasurementValue = (
         };
     }
 
-    // (3) supports format like [4], [null], or ['anything else']
-    // returns rounded number, null, or string
+    // supports a format like [4], [null], or ['anything else'] (returns rounded number, null, or string)
     if (Array.isArray(parsedValue) && parsedValue.length > 0 && conditionKeys.length === 1) {
         const cKeyAsInt = parseInt(conditionKeys[0]);
         if (isFiniteNumber(cKeyAsInt)) {
             const measurementValue = parsedValue?.[cKeyAsInt] ?? null;
-            // if it's a number, string, or null, we can do something with it
+            // if it's a number, string, or null, chart it
             if (isFiniteNumber(measurementValue) || typeof measurementValue === 'string' || measurementValue === null) {
                 const displayValue = formattedValue(measurementValue);
                 return {
@@ -469,7 +526,7 @@ const transformMeasurementValue = (
                     tableValue: {[cKeyAsInt]: displayValue},
                 };
             }
-            // if it exists, but it's not a good format, throw it in a table
+            // if it exists, but it's not a good format, just put it in a table
             return {
                 canChart: false,
                 tableValue: {[cKeyAsInt]: measurementValue.toString()},
@@ -481,10 +538,8 @@ const transformMeasurementValue = (
         };
     }
 
-    // supports formats 2) [4,6,3,5], [4,6,null,5], [4,6,'a string',5], [{anything},2,4,5]
-    // returns: first value in array
+    // supports format like [4,6,3,5], [4,6,null,5], [4,6,'a string',5], [{anything},2,4,5] (charts first value, puts stringified version in table)
     if (Array.isArray(parsedValue) && parsedValue.length > 0) {
-        // 2) array of values - just take first value
         const firstMeasurementValue = parsedValue[0];
         const canChartFirstValue = isChartable(firstMeasurementValue);
         return {
@@ -494,8 +549,7 @@ const transformMeasurementValue = (
         };
     }
 
-    // supports format 4) { key: value, key: value }
-    // returns TransformedObjectValue
+    // supports format like { key: value, key: value } (returns TransformedObjectValue)
     if (typeof parsedValue === 'object' && !Array.isArray(parsedValue) && conditionKeys.length > 0) {
         const transformedValue: TransformedValueObject = {};
         let canChart = true;
@@ -516,8 +570,7 @@ const transformMeasurementValue = (
         };
     }
 
-    // unsupported formats
-    // returns string for table display
+    // unsupported formats are stringified and put into table
     return {
         canChart: false,
         tableValue: parsedValue.toString(),

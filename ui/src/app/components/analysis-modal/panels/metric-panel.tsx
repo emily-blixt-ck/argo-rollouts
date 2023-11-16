@@ -3,7 +3,7 @@ import * as React from 'react';
 import {Radio, Typography} from 'antd';
 import type {RadioChangeEvent} from 'antd';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {faChartLine, faTable} from '@fortawesome/free-solid-svg-icons';
+import {faChartLine, faList} from '@fortawesome/free-solid-svg-icons';
 
 import Header from '../header/header';
 import CriteriaList from '../criteria-list/criteria-list';
@@ -13,26 +13,28 @@ import MetricTable from '../metric-table/metric-table';
 import QueryBox from '../query-box/query-box';
 import {AnalysisStatus, FunctionalStatus, TransformedMetricSpec, TransformedMetricStatus} from '../types';
 import {isFiniteNumber} from '../transforms';
+import {METRIC_CONSECUTIVE_ERROR_LIMIT_DEFAULT, METRIC_FAILURE_LIMIT_DEFAULT, METRIC_INCONCLUSIVE_LIMIT_DEFAULT} from '../constants';
 
 import classNames from 'classnames';
 import './styles.scss';
 
-const {Title} = Typography;
 const cx = classNames;
+
+const {Paragraph, Title} = Typography;
 
 interface MetricPanelProps {
     className?: string[] | string;
+    metricName: string;
     metricSpec?: TransformedMetricSpec;
     metricResults: TransformedMetricStatus;
     status: AnalysisStatus;
     substatus?: FunctionalStatus.ERROR | FunctionalStatus.WARNING;
-    title: string;
 }
 
-const MetricPanel = ({className, metricSpec, metricResults, status, substatus, title}: MetricPanelProps) => {
-    const consecutiveErrorLimit = isFiniteNumber(metricSpec.consecutiveErrorLimit ?? null) ? metricSpec.consecutiveErrorLimit : 0;
-    const failureLimit = isFiniteNumber(metricSpec.failureLimit ?? null) ? metricSpec.failureLimit : 0;
-    const inconclusiveLimit = isFiniteNumber(metricSpec.inconclusiveLimit ?? null) ? metricSpec.inconclusiveLimit : 0;
+const MetricPanel = ({className, metricName, metricSpec, metricResults, status, substatus}: MetricPanelProps) => {
+    const consecutiveErrorLimit = isFiniteNumber(metricSpec.consecutiveErrorLimit ?? null) ? metricSpec.consecutiveErrorLimit : METRIC_CONSECUTIVE_ERROR_LIMIT_DEFAULT;
+    const failureLimit = isFiniteNumber(metricSpec.failureLimit ?? null) ? metricSpec.failureLimit : METRIC_FAILURE_LIMIT_DEFAULT;
+    const inconclusiveLimit = isFiniteNumber(metricSpec.inconclusiveLimit ?? null) ? metricSpec.inconclusiveLimit : METRIC_INCONCLUSIVE_LIMIT_DEFAULT;
 
     const canChartMetric = metricResults.chartable && metricResults.chartMax !== null;
 
@@ -45,45 +47,57 @@ const MetricPanel = ({className, metricSpec, metricResults, status, substatus, t
     return (
         <div className={cx(className)}>
             <div className={cx('metric-header')}>
-                <Header title={title} subtitle={metricResults.statusLabel} status={status} substatus={substatus} />
+                <Header title={metricName} subtitle={metricResults.statusLabel} status={status} substatus={substatus} />
                 {canChartMetric && (
-                    <Radio.Group onChange={onChangeView} buttonStyle='outline' value={selectedView}>
+                    <Radio.Group onChange={onChangeView} value={selectedView} size='small'>
                         <Radio.Button value='chart'>
                             <FontAwesomeIcon icon={faChartLine} />
                         </Radio.Button>
                         <Radio.Button value='table'>
-                            <FontAwesomeIcon icon={faTable} />
+                            <FontAwesomeIcon icon={faList} />
                         </Radio.Button>
                     </Radio.Group>
                 )}
             </div>
-            <Legend
-                className={cx('legend')}
-                errors={metricResults.error ?? 0}
-                failures={metricResults.failed ?? 0}
-                inconclusives={metricResults.inconclusive ?? 0}
-                successes={metricResults.successful ?? 0}
-            />
-            {selectedView === 'chart' && (
-                <MetricChart
-                    className={cx('metric-section', 'top-content')}
-                    data={metricResults.transformedMeasurements}
-                    max={metricResults.chartMax}
-                    min={metricResults.chartMin}
-                    failThresholds={metricSpec.failThresholds}
-                    successThresholds={metricSpec.successThresholds}
-                    yAxisLabel={metricResults.name}
-                    conditionKeys={metricSpec.conditionKeys}
-                />
+            {status === AnalysisStatus.Pending && (
+                <Paragraph style={{marginTop: 12}}>
+                    {metricName} analysis measurements have not yet begun. Measurement information will appear here when it becomes available.
+                </Paragraph>
             )}
-            {selectedView === 'table' && (
-                <MetricTable
-                    className={cx('metric-section', 'top-content')}
-                    data={metricResults.transformedMeasurements}
-                    conditionKeys={metricSpec.conditionKeys}
-                    failCondition={metricSpec.failConditionLabel}
-                    successCondition={metricSpec.successConditionLabel}
-                />
+            {status !== AnalysisStatus.Pending && metricResults.transformedMeasurements.length === 0 && (
+                <Paragraph style={{marginTop: 12}}>Measurement results for {metricName} cannot be displayed.</Paragraph>
+            )}
+            {status !== AnalysisStatus.Pending && metricResults.transformedMeasurements.length > 0 && (
+                <>
+                    <Legend
+                        className={cx('legend')}
+                        errors={metricResults.error ?? 0}
+                        failures={metricResults.failed ?? 0}
+                        inconclusives={metricResults.inconclusive ?? 0}
+                        successes={metricResults.successful ?? 0}
+                    />
+                    {selectedView === 'chart' && (
+                        <MetricChart
+                            className={cx('metric-section', 'top-content')}
+                            data={metricResults.transformedMeasurements}
+                            max={metricResults.chartMax}
+                            min={metricResults.chartMin}
+                            failThresholds={metricSpec.failThresholds}
+                            successThresholds={metricSpec.successThresholds}
+                            yAxisLabel={metricResults.name}
+                            conditionKeys={metricSpec.conditionKeys}
+                        />
+                    )}
+                    {selectedView === 'table' && (
+                        <MetricTable
+                            className={cx('metric-section', 'top-content')}
+                            data={metricResults.transformedMeasurements}
+                            conditionKeys={metricSpec.conditionKeys}
+                            failCondition={metricSpec.failConditionLabel}
+                            successCondition={metricSpec.successConditionLabel}
+                        />
+                    )}
+                </>
             )}
             <div className={cx('metric-section', 'medium-space')}>
                 <Title className={cx('section-title')} level={5}>
@@ -100,15 +114,16 @@ const MetricPanel = ({className, metricSpec, metricResults, status, substatus, t
                     showIcons={metricResults.measurements?.length > 0}
                 />
             </div>
-            {metricSpec?.query !== undefined && (
+            {Array.isArray(metricSpec?.queries) && (
                 <>
                     <div className={cx('query-header')}>
                         <Title className={cx('section-title')} level={5}>
-                            Query
+                            {metricSpec.queries.length > 1 ? 'Queries' : 'Query'}
                         </Title>
-                        {/* <QueryLink query={transformedDetails.query} profile={metric.profile} /> */}
                     </div>
-                    <QueryBox className={cx('query-box')} query={metricSpec.query} />
+                    {metricSpec.queries.map((query, idx) => (
+                        <QueryBox key={`query-box-${idx}`} className={cx('query-box')} query={query} />
+                    ))}
                 </>
             )}
         </div>

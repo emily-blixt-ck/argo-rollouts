@@ -1,9 +1,6 @@
 @import 'node_modules/argo-ui/v2/styles/colors';
 
-// Colors copied from antd
-// Note: with antd 5+, less is no longer supported in favor of css-in-js.
-// Given this, we will need to decide how to proceed with our styling solution soon.
-
+// antd colors
 $gray-2: #fafafa;
 $gray-4: #f0f0f0;
 $gray-5: #d9d9d9;

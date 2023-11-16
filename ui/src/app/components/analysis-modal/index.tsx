@@ -7,13 +7,21 @@ import {AnalysisPanel, MetricPanel} from './panels';
 import {analysisEndTime, analysisStartTime, metricStatusLabel, metricSubstatus, transformMetrics} from './transforms';
 import {AnalysisStatus} from './types';
 
+import classNames from 'classnames';
+import './styles.scss';
+
+const cx = classNames;
+
 interface AnalysisModalProps {
     analysis: RolloutAnalysisRunInfo;
+    analysisName: string;
+    images: string[];
     onClose: () => void;
     open: boolean;
+    revision: string;
 }
 
-export const AnalysisModal = ({analysis, onClose, open}: AnalysisModalProps) => {
+export const AnalysisModal = ({analysis, analysisName, images, onClose, open, revision}: AnalysisModalProps) => {
     const analysisResults = analysis.specAndStatus?.status;
 
     const analysisStart = analysisStartTime(analysis.objectMeta?.creationTimestamp);
@@ -36,7 +44,8 @@ export const AnalysisModal = ({analysis, onClose, open}: AnalysisModalProps) => 
                     title={metricStatusLabel((analysis.status ?? AnalysisStatus.Unknown) as AnalysisStatus, analysis.failed ?? 0, analysis.error ?? 0, analysis.inconclusive ?? 0)}
                     status={(analysisResults.phase ?? AnalysisStatus.Unknown) as AnalysisStatus}
                     substatus={analysisSubstatus}
-                    image='image'
+                    images={images}
+                    revision={revision}
                     message={analysisResults.message}
                     startTime={analysisStart}
                     endTime={analysisEnd}
@@ -50,7 +59,7 @@ export const AnalysisModal = ({analysis, onClose, open}: AnalysisModalProps) => 
                 key: metric.name,
                 children: (
                     <MetricPanel
-                        title={metric.name}
+                        metricName={metric.name}
                         status={(metric.status.phase ?? AnalysisStatus.Unknown) as AnalysisStatus}
                         substatus={metric.status.substatus}
                         metricSpec={metric.spec}
@@ -61,8 +70,8 @@ export const AnalysisModal = ({analysis, onClose, open}: AnalysisModalProps) => 
     ];
 
     return (
-        <Modal centered open={open} title='Analysis' onCancel={onClose} width={866} footer={null}>
-            <Tabs tabPosition='left' size='small' items={tabItems} />
+        <Modal centered open={open} title={analysisName} onCancel={onClose} width={866} footer={null}>
+            <Tabs className={cx('tabs')} items={tabItems} tabPosition='left' size='small' tabBarGutter={12} />
         </Modal>
     );
 };

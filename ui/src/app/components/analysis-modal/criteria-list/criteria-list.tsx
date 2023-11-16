@@ -14,8 +14,11 @@ const {Text} = Typography;
 enum CriterionStatus {
     Fail = 'FAIL',
     Pass = 'PASS',
+    InProgress = 'IN_PROGRESS',
     Pending = 'PENDING',
 }
+
+const defaultCriterionStatus = (analysisStatus: AnalysisStatus) => (analysisStatus === AnalysisStatus.Pending ? CriterionStatus.Pending : CriterionStatus.InProgress);
 
 const criterionLabel = (measurementLabel: string, maxAllowed: number) => (maxAllowed === 0 ? `No ${measurementLabel}.` : `Fewer than ${maxAllowed + 1} ${measurementLabel}.`);
 
@@ -36,13 +39,15 @@ const CriteriaListItem = ({children, showIcon, status}: CriteriaListItemProps) =
             StatusIcon = <FontAwesomeIcon icon={faCheck} className={classNames('icon-pass')} />;
             break;
         }
-        case CriterionStatus.Pending: {
+        case CriterionStatus.InProgress: {
             StatusIcon = <FontAwesomeIcon icon={faRotateRight} className={classNames('icon-pending')} />;
             break;
         }
+        case CriterionStatus.Pending: {
+            StatusIcon = null;
+            break;
+        }
         default:
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-case-declarations
-            // const impossible: never = status;
             StatusIcon = null;
     }
 
@@ -79,9 +84,9 @@ const CriteriaList = ({
     maxInconclusives,
     showIcons,
 }: CriteriaListProps) => {
-    let failureStatus = CriterionStatus.Pending;
-    let errorStatus = CriterionStatus.Pending;
-    let inconclusiveStatus = CriterionStatus.Pending;
+    let failureStatus = defaultCriterionStatus(analysisStatus);
+    let errorStatus = defaultCriterionStatus(analysisStatus);
+    let inconclusiveStatus = defaultCriterionStatus(analysisStatus);
 
     if (analysisStatus !== AnalysisStatus.Pending && analysisStatus !== AnalysisStatus.Running) {
         failureStatus = failures <= maxFailures ? CriterionStatus.Pass : CriterionStatus.Fail;

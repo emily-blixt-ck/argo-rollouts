@@ -50,7 +50,7 @@ const MetricTable = ({className, conditionKeys, data, failCondition, successCond
             ) : (
                 <Column key='value' title='Value' dataIndex='tableValue' />
             )}
-            <Column key='time' title='Time' dataIndex='startedAt' render={(startedAt: any) => <span>{timeColFormatter(startedAt)}</span>} />
+            <Column key='time' title='Time' dataIndex='startedAt' render={(startedAt: string) => <span>{timeColFormatter(startedAt)}</span>} />
         </Table>
         {failCondition !== null && (
             <Text className={classNames('condition', 'is-ERROR')} type='secondary'>

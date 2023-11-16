@@ -34,7 +34,7 @@ export type TransformedMetricStatus = GithubComArgoprojArgoRolloutsPkgApisRollou
 export type TransformedMetricSpec = GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Metric & {
     failConditionLabel: string | null;
     failThresholds: number[] | null;
-    query?: string;
+    queries?: string[];
     successConditionLabel: string | null;
     successThresholds: number[] | null;
     conditionKeys: string[];

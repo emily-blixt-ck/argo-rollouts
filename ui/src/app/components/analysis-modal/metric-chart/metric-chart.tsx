@@ -112,9 +112,6 @@ const MetricChart = ({
                 <Tooltip content={<TooltipContent conditionKeys={conditionKeys} valueFormatter={valueFormatter} />} filterNull={false} />
                 {failThresholds !== null && (
                     <>
-                        {failThresholds.length === 2 && timeTicks.length === 2 && (
-                            <ReferenceArea className={cx('reference-area', 'is-ERROR')} x1={timeTicks[0]} x2={timeTicks[1]} y1={failThresholds[0]} y2={failThresholds[1]} />
-                        )}
                         {failThresholds.map((threshold, idx) => (
                             <ReferenceLine key={`fail-line-${idx}`} className={cx('reference-line', 'is-ERROR')} y={threshold} />
                         ))}
@@ -122,9 +119,6 @@ const MetricChart = ({
                 )}
                 {successThresholds !== null && (
                     <>
-                        {successThresholds.length === 2 && timeTicks.length === 2 && (
-                            <ReferenceArea className={cx('reference-area', 'is-SUCCESS')} x1={timeTicks[0]} x2={timeTicks[1]} y1={successThresholds[0]} y2={successThresholds[1]} />
-                        )}
                         {successThresholds.map((threshold, idx) => (
                             <ReferenceLine key={`success-line-${idx}`} className={cx('reference-line', 'is-SUCCESS')} y={threshold} />
                         ))}

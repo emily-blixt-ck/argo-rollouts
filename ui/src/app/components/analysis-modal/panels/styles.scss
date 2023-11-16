@@ -14,6 +14,7 @@
 
 .metric-header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     margin: $space-unit 0;
 }
@@ -35,7 +36,13 @@ h5.section-title {
 }
 
 .query-box {
-    margin-bottom: $space-large;
+    :not(:last-child) {
+        margin-bottom: $space-small;
+    }
+
+    :last-child {
+        margin-bottom: $space-large;
+    }
 }
 
 // Common
