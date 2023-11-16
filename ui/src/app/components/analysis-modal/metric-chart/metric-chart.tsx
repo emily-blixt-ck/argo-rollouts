@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as moment from 'moment';
-import {CartesianGrid, DotProps, Label, Line, LineChart, ReferenceLine, ResponsiveContainer, ReferenceArea, Tooltip, TooltipProps, XAxis, YAxis} from 'recharts';
+import {CartesianGrid, DotProps, Label, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, TooltipProps, XAxis, YAxis} from 'recharts';
 import {NameType, ValueType} from 'recharts/types/component/DefaultTooltipContent';
 import {Typography} from 'antd';
 
