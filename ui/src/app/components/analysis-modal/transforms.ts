@@ -490,12 +490,14 @@ export const transformMeasurements = (conditionKeys: string[], measurements?: Gi
  */
 const isChartable = (value: any): boolean => isFiniteNumber(value) || value === null;
 
+type FormattedMeasurementValue = number | string | null;
+
 /**
  *
  * @param value value to display
  * @returns value formatted for display purposes
  */
-const formattedValue = (value: any): number | null | string => {
+const formattedValue = (value: any): FormattedMeasurementValue => {
     const isNum = isFiniteNumber(value);
     return isNum ? roundNumber(Number(value)) : value?.toString() ?? null;
 };
@@ -520,7 +522,7 @@ const formatNumberMeasurement = (value: number): MeasurementValueInfo => {
  * @param accessor key by which to access measurement value
  * @returns information about displaying the measurement value
  */
-const formatSingleItemArrayMeasurement = (value: (string | number | null)[], accessor: number): MeasurementValueInfo => {
+const formatSingleItemArrayMeasurement = (value: FormattedMeasurementValue[], accessor: number): MeasurementValueInfo => {
     if (isFiniteNumber(accessor)) {
         const measurementValue = value?.[accessor] ?? null;
         // if it's a number, string, or null, chart it
@@ -549,7 +551,7 @@ const formatSingleItemArrayMeasurement = (value: (string | number | null)[], acc
  * @param value measurement value array (examples: [4,6,3,5] or [4,6,null,5] or [4,6,'a string',5] or [{anything: else},2,4,5]
  * @returns information about displaying the measurement value (charts a chartable first value, shows stringified value in table))
  */
-const formatMultiItemArrayMeasurement = (value: (string | number | null)[]): MeasurementValueInfo => {
+const formatMultiItemArrayMeasurement = (value: FormattedMeasurementValue[]): MeasurementValueInfo => {
     const firstMeasurementValue = value[0];
     const canChartFirstValue = isChartable(firstMeasurementValue);
     return {
@@ -565,7 +567,7 @@ const formatMultiItemArrayMeasurement = (value: (string | number | null)[]): Mea
  * @param accessors keys by which to access measurement values
  * @returns information about displaying the measurement value (returns TransformedObjectValue))
  */
-const formatKeyValueMeasurement = (value: {[key: string]: string | number | null}, accessors: string[]): MeasurementValueInfo => {
+const formatKeyValueMeasurement = (value: {[key: string]: FormattedMeasurementValue}, accessors: string[]): MeasurementValueInfo => {
     const transformedValue: TransformedValueObject = {};
     let canChart = true;
     accessors.forEach((accessor) => {
@@ -579,7 +581,7 @@ const formatKeyValueMeasurement = (value: {[key: string]: string | number | null
         }
     });
     return {
-        canChart: canChart && !Object.values(transformedValue).every((v: string | number | null) => v === null),
+        canChart: canChart && !Object.values(transformedValue).every((v: FormattedMeasurementValue) => v === null),
         chartValue: transformedValue,
         tableValue: transformedValue,
     };
