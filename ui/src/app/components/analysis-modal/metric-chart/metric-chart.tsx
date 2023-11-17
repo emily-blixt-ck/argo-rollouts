@@ -27,15 +27,15 @@ const timeTickFormatter = (axisData?: string) => {
 };
 
 type MeasurementDotProps = DotProps & {
-    payload: {
+    payload?: {
         phase: AnalysisStatus;
         startedAt: string;
         value: string | null;
     };
 };
 
-const MeasurementDot = ({cx, cy, height, payload}: MeasurementDotProps) => (
-    <circle r={4} cx={cx} cy={cy} className={`dot-${ANALYSIS_STATUS_THEME_MAP[payload.phase as AnalysisStatus] as FunctionalStatus}`} />
+const MeasurementDot = ({cx, cy, payload}: MeasurementDotProps) => (
+    <circle r={4} cx={cx} cy={cy} className={`dot-${ANALYSIS_STATUS_THEME_MAP[payload?.phase ?? AnalysisStatus.Unknown] as FunctionalStatus}`} />
 );
 
 type TooltipContentProps = TooltipProps<ValueType, NameType> & {
@@ -141,19 +141,12 @@ const MetricChart = ({
                         dataKey={conditionKeys.length === 0 ? 'chartValue' : `chartValue.${conditionKeys[0]}`}
                         isAnimationActive={false}
                         activeDot={false}
-                        dot={(props: any) => <MeasurementDot payload={props.payload} {...props} />}
+                        dot={<MeasurementDot />}
                     />
                 ) : (
                     <>
                         {conditionKeys.map((cKey) => (
-                            <Line
-                                key={cKey}
-                                className={cx('chart-line')}
-                                dataKey={`chartValue.${cKey}`}
-                                isAnimationActive={false}
-                                activeDot={false}
-                                dot={(props: any) => <MeasurementDot payload={props.payload} {...props} />}
-                            />
+                            <Line key={cKey} className={cx('chart-line')} dataKey={`chartValue.${cKey}`} isAnimationActive={false} activeDot={false} dot={<MeasurementDot />} />
                         ))}
                     </>
                 )}

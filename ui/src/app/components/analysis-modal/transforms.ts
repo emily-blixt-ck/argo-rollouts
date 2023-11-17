@@ -3,6 +3,8 @@ import * as moment from 'moment';
 
 import {
     GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Argument,
+    GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1CloudWatchMetric,
+    GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1DatadogMetric,
     GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Measurement,
     GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider,
     GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricResult,
@@ -226,6 +228,8 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
 
             // results values
             const transformedMeasurementInfo = transformMeasurements(conditionKeys, metricResults?.measurements);
+            const {measurements, chartable, min, max} = transformedMeasurementInfo;
+
             const metricStatus = (metricResults?.phase ?? AnalysisStatus.Unknown) as AnalysisStatus;
             const measurementFailures = metricResults?.failed ?? 0;
             const measurementErrors = metricResults?.error ?? 0;
@@ -246,10 +250,10 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
                     ...metricResults,
                     statusLabel: metricStatusLabel(metricStatus, measurementFailures, measurementErrors, measurementInconclusives),
                     substatus: metricSubstatus(metricStatus, measurementFailures, measurementErrors, measurementInconclusives),
-                    transformedMeasurements: transformedMeasurementInfo.measurements,
-                    chartable: transformedMeasurementInfo.chartable,
-                    chartMin: transformedMeasurementInfo.min,
-                    chartMax: chartMax(transformedMeasurementInfo.max, failThresholds, successThresholds),
+                    transformedMeasurements: measurements,
+                    chartable,
+                    chartMin: min,
+                    chartMax: chartMax(max, failThresholds, successThresholds),
                 },
             };
         }
@@ -316,15 +320,13 @@ export const metricStatusLabel = (status: AnalysisStatus, failures: number, erro
         case AnalysisStatus.Error:
             return 'Analysis errored';
         case AnalysisStatus.Successful:
-            if (!hasFailures && !hasErrors && !hasInconclusives) {
-                extraDetails = '';
-            } else if (hasFailures && !hasErrors && !hasInconclusives) {
+            if (hasFailures && !hasErrors && !hasInconclusives) {
                 extraDetails = 'with measurement failures';
             } else if (!hasFailures && hasErrors && !hasInconclusives) {
                 extraDetails = 'with measurement errors';
             } else if (!hasFailures && !hasErrors && hasInconclusives) {
                 extraDetails = 'with inconclusive measurements';
-            } else {
+            } else if (hasFailures || hasErrors || hasInconclusives) {
                 extraDetails = 'with multiple issues';
             }
             return `Analysis passed ${extraDetails}`.trim();
@@ -358,6 +360,49 @@ export const interpolateQuery = (query?: string, args?: GithubComArgoprojArgoRol
 
 /**
  *
+ * @param datadog datadog metric object
+ * @param args arguments name/value pairs associated with the analysis run
+ * @returns query formatted for display or undefined
+ */
+export const printableDatadogQuery = (
+    datadog: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1DatadogMetric,
+    args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Argument[]
+): string[] | undefined => {
+    if ((datadog.apiVersion ?? '').toLowerCase() === 'v1' && 'query' in datadog) {
+        return [interpolateQuery(datadog.query, args)];
+    }
+    if ((datadog.apiVersion ?? '').toLowerCase() === 'v2') {
+        if ('query' in datadog) {
+            return 'formula' in datadog
+                ? [
+                      `query: ${datadog.query}, 
+                    formula: ${datadog.formula}`,
+                  ]
+                : [interpolateQuery(datadog.query, args)];
+        }
+        if ('queries' in datadog) {
+            return 'fomula' in datadog
+                ? [
+                      `queries: ${JSON.stringify(datadog.queries)}, 
+                    formula: ${datadog.formula}`,
+                  ]
+                : Object.values(datadog.queries).map((query) => interpolateQuery(query, args));
+        }
+    }
+    return undefined;
+};
+
+/**
+ *
+ * @param cloudWatch cloudwatch metric object
+ * @returns query formatted for display or undefined
+ */
+export const printableCloudWatchQuery = (cloudWatch: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1CloudWatchMetric): string[] | undefined => {
+    return Array.isArray(cloudWatch.metricDataQueries) ? cloudWatch.metricDataQueries.map((query) => JSON.stringify(query)) : undefined;
+};
+
+/**
+ *
  * @param provider metric provider object
  * @param args arguments name/value pairs associated with the analysis run
  * @returns query formatted for display or undefined
@@ -374,36 +419,13 @@ export const metricQueries = (
         case 'prometheus':
             return [interpolateQuery(provider.prometheus.query, args)];
         case 'datadog':
-            if ((provider.datadog.apiVersion ?? '').toLowerCase() === 'v1' && 'query' in provider.datadog) {
-                return [interpolateQuery(provider.datadog.query, args)];
-            }
-            if ((provider.datadog.apiVersion ?? '').toLowerCase() === 'v2') {
-                if ('query' in provider.datadog) {
-                    if ('formula' in provider.datadog) {
-                        return [
-                            `query: ${provider.datadog.query}, 
-                            formula: ${provider.datadog.formula}`,
-                        ];
-                    }
-                    return [interpolateQuery(provider.datadog.query, args)];
-                }
-                if ('queries' in provider.datadog) {
-                    if ('fomula' in provider.datadog) {
-                        return [
-                            `queries: ${JSON.stringify(provider.datadog.queries)}, 
-                            formula: ${provider.datadog.formula}`,
-                        ];
-                    }
-                    return Object.values(provider.datadog.queries).map((query) => interpolateQuery(query, args));
-                }
-            }
-            return undefined;
+            return printableDatadogQuery(provider.datadog, args);
         case 'wavefront':
             return [interpolateQuery(provider.wavefront.query, args)];
         case 'newRelic':
             return [interpolateQuery(provider.newRelic.query, args)];
         case 'cloudWatch':
-            return Array.isArray(provider.cloudWatch.metricDataQueries) ? provider.cloudWatch.metricDataQueries.map((query) => JSON.stringify(query)) : undefined;
+            return printableCloudWatchQuery(provider.cloudWatch);
         case 'graphite':
             return [interpolateQuery(provider.graphite.query, args)];
         case 'influxdb':
