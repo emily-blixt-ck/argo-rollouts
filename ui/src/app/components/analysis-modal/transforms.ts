@@ -10,7 +10,7 @@ import {
     GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricResult,
     RolloutAnalysisRunSpecAndStatus,
 } from '../../../models/rollout/generated';
-import {AnalysisStatus, FunctionalStatus, MeasurementInfo, TransformedMeasurement, TransformedMetric, TransformedValueObject} from './types';
+import {AnalysisStatus, FunctionalStatus, MeasurementSetInfo, MeasurementValueInfo, TransformedMeasurement, TransformedMetric, TransformedValueObject} from './types';
 
 export const isFiniteNumber = (value: any) => Number.isFinite(value);
 
@@ -352,7 +352,7 @@ export const interpolateQuery = (query?: string, args?: GithubComArgoprojArgoRol
 
     const regex = /\{{.*?\}}/g;
     return query.replace(regex, (match) => {
-        const argPieces = match.replace(/[{{ }}]/g, '').split('.');
+        const argPieces = match.replace(/[{ }]/g, '').split('.');
         const replacementValue = argValue(args, argPieces?.[1] ?? '');
         return replacementValue ?? match;
     });
@@ -446,7 +446,7 @@ export const metricQueries = (
  * @param measurements array of metric measurements
  * @returns formatted measurement values and chart information if the metric can be charted
  */
-export const transformMeasurements = (conditionKeys: string[], measurements?: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Measurement[]): MeasurementInfo => {
+export const transformMeasurements = (conditionKeys: string[], measurements?: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Measurement[]): MeasurementSetInfo => {
     if (measurements === undefined || measurements.length === 0) {
         return {
             chartable: false,
@@ -502,18 +502,96 @@ const formattedValue = (value: any): number | null | string => {
 
 /**
  *
+ * @param value measurement value number (examples: 4 or 4.05)
+ * @returns information about displaying the measurement value
+ */
+const formatNumberMeasurement = (value: number): MeasurementValueInfo => {
+    const displayValue = formattedValue(value);
+    return {
+        canChart: true,
+        chartValue: displayValue,
+        tableValue: displayValue,
+    };
+};
+
+/**
+ *
+ * @param value measurement value array (examples: [4] or [null] or ['anything else'])
+ * @param accessor key by which to access measurement value
+ * @returns information about displaying the measurement value
+ */
+const formatSingleItemArrayMeasurement = (value: (string | number | null)[], accessor: number): MeasurementValueInfo => {
+    if (isFiniteNumber(accessor)) {
+        const measurementValue = value?.[accessor] ?? null;
+        // if it's a number, string, or null, chart it
+        if (isFiniteNumber(measurementValue) || typeof measurementValue === 'string' || measurementValue === null) {
+            const displayValue = formattedValue(measurementValue);
+            return {
+                canChart: isChartable(measurementValue),
+                chartValue: {[accessor]: displayValue},
+                tableValue: {[accessor]: displayValue},
+            };
+        }
+        // if it exists, but it's not a good format, just put it in a table
+        return {
+            canChart: false,
+            tableValue: {[accessor]: measurementValue.toString()},
+        };
+    }
+    return {
+        canChart: false,
+        tableValue: value.toString(),
+    };
+};
+
+/**
+ *
+ * @param value measurement value array (examples: [4,6,3,5] or [4,6,null,5] or [4,6,'a string',5] or [{anything: else},2,4,5]
+ * @returns information about displaying the measurement value (charts a chartable first value, shows stringified value in table))
+ */
+const formatMultiItemArrayMeasurement = (value: (string | number | null)[]): MeasurementValueInfo => {
+    const firstMeasurementValue = value[0];
+    const canChartFirstValue = isChartable(firstMeasurementValue);
+    return {
+        canChart: canChartFirstValue,
+        ...(canChartFirstValue && {chartValue: formattedValue(firstMeasurementValue)}),
+        tableValue: value.toString(),
+    };
+};
+
+/**
+ *
+ * @param value measurement value object (example: { key1: 5, key2: 154, key3: 'abc' }
+ * @param accessors keys by which to access measurement values
+ * @returns information about displaying the measurement value (returns TransformedObjectValue))
+ */
+const formatKeyValueMeasurement = (value: {[key: string]: string | number | null}, accessors: string[]): MeasurementValueInfo => {
+    const transformedValue: TransformedValueObject = {};
+    let canChart = true;
+    accessors.forEach((accessor) => {
+        if (accessor in value) {
+            const measurementValue = value[accessor];
+            const displayValue = formattedValue(measurementValue);
+            canChart = canChart && isChartable(measurementValue);
+            transformedValue[accessor] = displayValue;
+        } else {
+            transformedValue[accessor] = null;
+        }
+    });
+    return {
+        canChart: canChart && !Object.values(transformedValue).every((v: string | number | null) => v === null),
+        chartValue: transformedValue,
+        tableValue: transformedValue,
+    };
+};
+
+/**
+ *
  * @param conditionKeys keys from success/fail conditions used in some cases to pull values from the measurement result
  * @param value measurement value returned by provider
  * @returns chart and table data along with a flag indicating whether the measurement value can be charted
  */
-const transformMeasurementValue = (
-    conditionKeys: string[],
-    value?: string
-): {
-    canChart: boolean;
-    chartValue?: TransformedValueObject | number | string | null;
-    tableValue: TransformedValueObject | number | string | null;
-} => {
+const transformMeasurementValue = (conditionKeys: string[], value?: string): MeasurementValueInfo => {
     if (value === undefined || value === '') {
         return {
             canChart: true,
@@ -524,72 +602,25 @@ const transformMeasurementValue = (
 
     const parsedValue = JSON.parse(value);
 
-    // supports a format like 4 or 4.05 (returned as rounded number)
+    // single number measurement value
     if (isFiniteNumber(parsedValue)) {
-        const displayValue = formattedValue(parsedValue);
-        return {
-            canChart: true,
-            chartValue: displayValue,
-            tableValue: displayValue,
-        };
+        return formatNumberMeasurement(parsedValue);
     }
 
-    // supports a format like [4], [null], or ['anything else'] (returns rounded number, null, or string)
+    // single item array measurement value
     if (Array.isArray(parsedValue) && parsedValue.length > 0 && conditionKeys.length === 1) {
-        const cKeyAsInt = parseInt(conditionKeys[0]);
-        if (isFiniteNumber(cKeyAsInt)) {
-            const measurementValue = parsedValue?.[cKeyAsInt] ?? null;
-            // if it's a number, string, or null, chart it
-            if (isFiniteNumber(measurementValue) || typeof measurementValue === 'string' || measurementValue === null) {
-                const displayValue = formattedValue(measurementValue);
-                return {
-                    canChart: isChartable(measurementValue),
-                    chartValue: {[cKeyAsInt]: displayValue},
-                    tableValue: {[cKeyAsInt]: displayValue},
-                };
-            }
-            // if it exists, but it's not a good format, just put it in a table
-            return {
-                canChart: false,
-                tableValue: {[cKeyAsInt]: measurementValue.toString()},
-            };
-        }
-        return {
-            canChart: false,
-            tableValue: parsedValue.toString(),
-        };
+        const accessor = parseInt(conditionKeys[0]);
+        return formatSingleItemArrayMeasurement(parsedValue, accessor);
     }
 
-    // supports format like [4,6,3,5], [4,6,null,5], [4,6,'a string',5], [{anything},2,4,5] (charts first value, puts stringified version in table)
+    // multi-item array measurement value
     if (Array.isArray(parsedValue) && parsedValue.length > 0) {
-        const firstMeasurementValue = parsedValue[0];
-        const canChartFirstValue = isChartable(firstMeasurementValue);
-        return {
-            canChart: canChartFirstValue,
-            ...(canChartFirstValue && {chartValue: formattedValue(firstMeasurementValue)}),
-            tableValue: parsedValue.toString(),
-        };
+        return formatMultiItemArrayMeasurement(parsedValue);
     }
 
-    // supports format like { key: value, key: value } (returns TransformedObjectValue)
+    // key / value pairs measurement value
     if (typeof parsedValue === 'object' && !Array.isArray(parsedValue) && conditionKeys.length > 0) {
-        const transformedValue: TransformedValueObject = {};
-        let canChart = true;
-        conditionKeys.forEach((cKey) => {
-            if (cKey in parsedValue) {
-                const measurementValue = parsedValue[cKey];
-                const displayValue = formattedValue(measurementValue);
-                canChart = canChart && isChartable(measurementValue);
-                transformedValue[cKey] = displayValue;
-            } else {
-                transformedValue[cKey] = null;
-            }
-        });
-        return {
-            canChart: canChart && !Object.values(transformedValue).every((v: string | number | null) => v === null),
-            chartValue: transformedValue,
-            tableValue: transformedValue,
-        };
+        return formatKeyValueMeasurement(parsedValue, conditionKeys);
     }
 
     // unsupported formats are stringified and put into table

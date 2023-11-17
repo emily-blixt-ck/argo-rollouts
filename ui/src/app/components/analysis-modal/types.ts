@@ -55,9 +55,15 @@ export type TransformedMeasurement = GithubComArgoprojArgoRolloutsPkgApisRollout
     tableValue: TransformedValueObject | number | string | null;
 };
 
-export type MeasurementInfo = {
+export type MeasurementSetInfo = {
     chartable: boolean;
     max: number | null;
     measurements: TransformedMeasurement[];
     min: number;
+};
+
+export type MeasurementValueInfo = {
+    canChart: boolean;
+    chartValue?: TransformedValueObject | number | string | null;
+    tableValue: TransformedValueObject | number | string | null;
 };
