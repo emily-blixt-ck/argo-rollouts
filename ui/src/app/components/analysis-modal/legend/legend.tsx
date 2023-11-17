@@ -21,6 +21,8 @@ const LegendItem = ({label, status}: LegendItemProps) => (
     </Space>
 );
 
+const pluralize = (count: number, singular: string, plural: string) => (count === 1 ? singular : plural);
+
 interface LegendProps {
     className?: string[] | string;
     errors: number;
@@ -31,9 +33,9 @@ interface LegendProps {
 
 const Legend = ({className, errors, failures, inconclusives, successes}: LegendProps) => (
     <Space className={classNames(className)} size='small'>
-        {successes > 0 && <LegendItem status={AnalysisStatus.Successful} label={`${successes} Success${successes !== 1 ? `es` : ''}`} />}
-        {failures > 0 && <LegendItem status={AnalysisStatus.Failed} label={`${failures} Failure${failures !== 1 ? `s` : ''}`} />}
-        {errors > 0 && <LegendItem status={AnalysisStatus.Error} label={`${errors} Error${errors !== 1 ? `s` : ''}`} />}
+        {successes > 0 && <LegendItem status={AnalysisStatus.Successful} label={`${successes} ${pluralize(successes, 'Success', 'Successes')}`} />}
+        {failures > 0 && <LegendItem status={AnalysisStatus.Failed} label={`${failures} ${pluralize(failures, 'Failure', 'Failures')}`} />}
+        {errors > 0 && <LegendItem status={AnalysisStatus.Error} label={`${errors} ${pluralize(errors, 'Error', 'Errors')}`} />}
         {inconclusives > 0 && <LegendItem status={AnalysisStatus.Inconclusive} label={`${inconclusives} Inconclusive`} />}
     </Space>
 );

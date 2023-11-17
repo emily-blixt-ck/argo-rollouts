@@ -1,3 +1,4 @@
+// eslint-disable-file @typescript-eslint/ban-ts-comment
 import * as moment from 'moment';
 
 import {
@@ -39,7 +40,9 @@ export const analysisEndTime = (metricResults: GithubComArgoprojArgoRolloutsPkgA
     const measurementEndTimes: number[] = [];
     metricResults.forEach((metricResult) => {
         (metricResult.measurements ?? []).forEach((measurement) => {
+            // @ts-ignore
             if (isValidDate(measurement.finishedAt)) {
+                // @ts-ignore
                 measurementEndTimes.push(new Date(measurement.finishedAt).getTime());
             }
         });
@@ -351,7 +354,7 @@ export const interpolateQuery = (query?: string, args?: GithubComArgoprojArgoRol
     return query.replace(regex, (match) => {
         const argPieces = match.replace(/[{{ }}]/g, '').split('.');
         const replacementValue = argValue(args, argPieces?.[1] ?? '');
-        return replacementValue === null ? match : replacementValue;
+        return replacementValue ?? match;
     });
 };
 
@@ -474,8 +477,7 @@ const isChartable = (value: any): boolean => isFiniteNumber(value) || value === 
  */
 const formattedValue = (value: any): number | null | string => {
     const isNum = isFiniteNumber(value);
-    const isNull = value === null;
-    return isNum ? roundNumber(Number(value)) : isNull ? null : value.toString();
+    return isNum ? roundNumber(Number(value)) : value?.toString() ?? null;
 };
 
 /**

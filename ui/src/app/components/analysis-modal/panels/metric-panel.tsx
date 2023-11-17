@@ -1,3 +1,4 @@
+// eslint-disable-file @typescript-eslint/ban-ts-comment
 import * as React from 'react';
 
 import {Radio, Typography} from 'antd';
@@ -105,8 +106,11 @@ const MetricPanel = ({className, metricName, metricSpec, metricResults, status, 
                 </Title>
                 <CriteriaList
                     analysisStatus={status}
+                    // @ts-ignore
                     maxConsecutiveErrors={consecutiveErrorLimit}
+                    // @ts-ignore
                     maxFailures={failureLimit}
+                    // @ts-ignore
                     maxInconclusives={inconclusiveLimit}
                     consecutiveErrors={metricResults.consecutiveError ?? 0}
                     failures={metricResults.failed ?? 0}
@@ -121,8 +125,8 @@ const MetricPanel = ({className, metricName, metricSpec, metricResults, status, 
                             {metricSpec.queries.length > 1 ? 'Queries' : 'Query'}
                         </Title>
                     </div>
-                    {metricSpec.queries.map((query, idx) => (
-                        <QueryBox key={`query-box-${idx}`} className={cx('query-box')} query={query} />
+                    {metricSpec.queries.map((query) => (
+                        <QueryBox key={`query-box-${query}`} className={cx('query-box')} query={query} />
                     ))}
                 </>
             )}

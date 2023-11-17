@@ -16,6 +16,8 @@ const timeColFormatter = (startTime?: string) => (isValidDate(startTime) ? momen
 
 const isObject = (tValue: TransformedValueObject | number | string | null) => typeof tValue === 'object' && !Array.isArray(tValue) && tValue !== null;
 
+const columnValueLabel = (value: any, valueKey: string) => (isObject(value) && valueKey in (value as TransformedValueObject) ? (value as TransformedValueObject)[valueKey] : '');
+
 interface MetricTableProps {
     className?: string[] | string;
     conditionKeys: string[];
@@ -36,12 +38,8 @@ const MetricTable = ({className, conditionKeys, data, failCondition, successCond
                             title={cKey}
                             render={(columnValue: TransformedMeasurement) => {
                                 const isError = columnValue.phase === AnalysisStatus.Error;
-                                const {tableValue} = columnValue;
-                                const label = isError
-                                    ? columnValue.message ?? 'Measurement error'
-                                    : isObject(tableValue) && cKey in (tableValue as TransformedValueObject)
-                                    ? (tableValue as TransformedValueObject)[cKey]
-                                    : '';
+                                const errorMessage = columnValue.message ?? 'Measurement error';
+                                const label = isError ? errorMessage : columnValueLabel(columnValue.tableValue, cKey);
                                 return <span className={classNames(isError && 'error-message')}>{label}</span>;
                             }}
                         />

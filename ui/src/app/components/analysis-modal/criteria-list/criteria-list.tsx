@@ -43,12 +43,11 @@ const CriteriaListItem = ({children, showIcon, status}: CriteriaListItemProps) =
             StatusIcon = <FontAwesomeIcon icon={faRotateRight} className={classNames('icon-pending')} />;
             break;
         }
-        case CriterionStatus.Pending: {
+        case CriterionStatus.Pending:
+        default: {
             StatusIcon = null;
             break;
         }
-        default:
-            StatusIcon = null;
     }
 
     return (

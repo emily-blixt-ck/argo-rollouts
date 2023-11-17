@@ -24,6 +24,8 @@ interface AnalysisModalProps {
 export const AnalysisModal = ({analysis, analysisName, images, onClose, open, revision}: AnalysisModalProps) => {
     const analysisResults = analysis.specAndStatus?.status;
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     const analysisStart = analysisStartTime(analysis.objectMeta?.creationTimestamp);
     const analysisEnd = analysisEndTime(analysisResults?.metricResults ?? []);
 

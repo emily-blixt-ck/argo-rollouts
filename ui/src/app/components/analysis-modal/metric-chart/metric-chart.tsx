@@ -47,7 +47,8 @@ const TooltipContent = ({active, conditionKeys, payload, valueFormatter}: Toolti
     if (data.phase === AnalysisStatus.Error) {
         label = data.message ?? 'Measurement error';
     } else if (conditionKeys.length > 0) {
-        label = conditionKeys.map((cKey) => `${valueFormatter(data.chartValue[cKey])} ${conditionKeys.length > 1 ? ` (${cKey})` : ''}`).join(' , ');
+        const sublabels = conditionKeys.map((cKey) => (conditionKeys.length > 1 ? `${valueFormatter(data.chartValue[cKey])} (${cKey})` : valueFormatter(data.chartValue[cKey])));
+        label = sublabels.join(' , ');
     } else {
         label = valueFormatter(data.chartValue);
     }
@@ -91,6 +92,8 @@ const MetricChart = ({
     yAxisLabel,
 }: MetricChartProps) => {
     // show ticks at boundaries of analysis
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     const timeTicks: string[] = [...([data[0]?.startedAt] ?? []), ...(data.length > 1 ? [data[data.length - 1]?.startedAt] ?? [] : [])];
 
     return (
@@ -112,15 +115,15 @@ const MetricChart = ({
                 <Tooltip content={<TooltipContent conditionKeys={conditionKeys} valueFormatter={valueFormatter} />} filterNull={false} />
                 {failThresholds !== null && (
                     <>
-                        {failThresholds.map((threshold, idx) => (
-                            <ReferenceLine key={`fail-line-${idx}`} className={cx('reference-line', 'is-ERROR')} y={threshold} />
+                        {failThresholds.map((threshold) => (
+                            <ReferenceLine key={`fail-line-${threshold}`} className={cx('reference-line', 'is-ERROR')} y={threshold} />
                         ))}
                     </>
                 )}
                 {successThresholds !== null && (
                     <>
-                        {successThresholds.map((threshold, idx) => (
-                            <ReferenceLine key={`success-line-${idx}`} className={cx('reference-line', 'is-SUCCESS')} y={threshold} />
+                        {successThresholds.map((threshold) => (
+                            <ReferenceLine key={`success-line-${threshold}`} className={cx('reference-line', 'is-SUCCESS')} y={threshold} />
                         ))}
                     </>
                 )}
