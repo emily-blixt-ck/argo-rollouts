@@ -45,7 +45,6 @@ const CriteriaListItem = ({children, showIcon, status}: CriteriaListItemProps) =
         }
         case CriterionStatus.Pending:
         default: {
-            StatusIcon = null;
             break;
         }
     }

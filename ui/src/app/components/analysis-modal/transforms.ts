@@ -226,6 +226,11 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
 
             // results values
             const transformedMeasurementInfo = transformMeasurements(conditionKeys, metricResults?.measurements);
+            const metricStatus = (metricResults?.phase ?? AnalysisStatus.Unknown) as AnalysisStatus;
+            const measurementFailures = metricResults?.failed ?? 0;
+            const measurementErrors = metricResults?.error ?? 0;
+            const measurementInconclusives = metricResults?.inconclusive ?? 0;
+
             transformedMetrics[metricName] = {
                 name: metricName,
                 spec: {
@@ -239,18 +244,8 @@ export const transformMetrics = (specAndStatus?: RolloutAnalysisRunSpecAndStatus
                 },
                 status: {
                     ...metricResults,
-                    statusLabel: metricStatusLabel(
-                        (metricResults?.phase ?? AnalysisStatus.Unknown) as AnalysisStatus,
-                        metricResults.failed ?? 0,
-                        metricResults.error ?? 0,
-                        metricResults.inconclusive ?? 0
-                    ),
-                    substatus: metricSubstatus(
-                        (metricResults?.phase ?? AnalysisStatus.Unknown) as AnalysisStatus,
-                        metricResults.failed ?? 0,
-                        metricResults.error ?? 0,
-                        metricResults.inconclusive ?? 0
-                    ),
+                    statusLabel: metricStatusLabel(metricStatus, measurementFailures, measurementErrors, measurementInconclusives),
+                    substatus: metricSubstatus(metricStatus, measurementFailures, measurementErrors, measurementInconclusives),
                     transformedMeasurements: transformedMeasurementInfo.measurements,
                     chartable: transformedMeasurementInfo.chartable,
                     chartMin: transformedMeasurementInfo.min,
