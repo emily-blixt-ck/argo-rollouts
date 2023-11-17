@@ -154,7 +154,10 @@ export const conditionDetails = (
     subconditions.forEach((subcondition) => {
         const subconditionParts = subcondition.split(' ');
         if (subconditionParts.length === 3) {
-            const {isFormatSupported, conditionKey} = PROVIDER_CONDITION_SUPPORT[providerType]?.(subconditionParts[0].trim());
+            const providerInfo = PROVIDER_CONDITION_SUPPORT[providerType]?.(subconditionParts[0].trim());
+            const isFormatSupported = providerInfo?.isFormatSupported ?? false;
+            const conditionKey = providerInfo?.conditionKey ?? null;
+
             const isUnderOverThreshold = subconditionParts[1].includes('<') || subconditionParts[1].includes('>');
             const isChartableThreshold = isFiniteNumber(parseFloat(subconditionParts[2]));
 
@@ -392,7 +395,7 @@ export const metricQueries = (
                 if ('queries' in provider.datadog) {
                     if ('fomula' in provider.datadog) {
                         return [
-                            `queries: ${provider.datadog.queries}, 
+                            `queries: ${JSON.stringify(provider.datadog.queries)}, 
                             formula: ${provider.datadog.formula}`,
                         ];
                     }

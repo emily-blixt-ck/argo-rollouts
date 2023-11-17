@@ -1,3 +1,4 @@
+// eslint-disable-file @typescript-eslint/ban-ts-comment
 import * as React from 'react';
 import * as moment from 'moment';
 import {CartesianGrid, DotProps, Label, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, TooltipProps, XAxis, YAxis} from 'recharts';
@@ -18,7 +19,12 @@ const cx = classNames;
 
 const defaultValueFormatter = (value: number | string | null) => (value === null ? '' : value.toString());
 
-const timeTickFormatter = (axisData: string) => (isValidDate(axisData) ? moment(axisData).format('LT') : '');
+const timeTickFormatter = (axisData?: string) => {
+    if (axisData === undefined || !isValidDate(axisData)) {
+        return '';
+    }
+    return moment(axisData).format('LT');
+};
 
 type MeasurementDotProps = DotProps & {
     payload: {
@@ -92,9 +98,11 @@ const MetricChart = ({
     yAxisLabel,
 }: MetricChartProps) => {
     // show ticks at boundaries of analysis
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    const timeTicks: string[] = [...([data[0]?.startedAt] ?? []), ...(data.length > 1 ? [data[data.length - 1]?.startedAt] ?? [] : [])];
+    const startingTick = data[0]?.startedAt ?? '';
+    // @ts-ignore
+    const endingTick = data[data.length - 1]?.finishedAt ?? '';
+    const timeTicks: any[] = [startingTick, endingTick];
 
     return (
         <ResponsiveContainer className={cx(className)} height={254} width='100%'>

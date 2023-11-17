@@ -31,7 +31,7 @@ const QueryBox = ({className, query}: QueryBoxProps) => {
             ref={queryTextRef}
             className={classNames('query-box', canExpand && 'can-expand', expanded && 'is-expanded', className)}
             title={canExpand ? 'Click to expand query' : undefined}>
-            <pre className={classNames('query')} onClick={expandQuery}>
+            <pre className={classNames('query')} onClick={expandQuery} onKeyDown={expandQuery}>
                 {query}
             </pre>
             <Paragraph className={classNames('query-copy-button')} copyable={{text: query}} />
