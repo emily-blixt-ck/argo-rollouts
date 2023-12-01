@@ -16,7 +16,7 @@ export const isFiniteNumber = (value: any) => Number.isFinite(value);
 
 export const roundNumber = (value: number): number => Math.round(value * 100) / 100;
 
-export const isValidDate = (value?: string): boolean => moment(value).isValid();
+export const isValidDate = (value?: string): boolean => value !== undefined && moment(value).isValid();
 
 // Overall Analysis Utils
 
@@ -25,9 +25,7 @@ export const isValidDate = (value?: string): boolean => moment(value).isValid();
  * @param startTime start time of the analysis run
  * @returns timestamp in ms or null
  */
-export const analysisStartTime = (startTime?: string): number | null => {
-    return isValidDate(startTime) ? new Date(startTime).getTime() : null;
-};
+export const analysisStartTime = (startTime?: string): number | null => (isValidDate(startTime) ? new Date(startTime).getTime() : null);
 
 /**
  *
@@ -62,6 +60,7 @@ export const analysisEndTime = (metricResults: GithubComArgoprojArgoRolloutsPkgA
  * @param argName name of arg for which to find the value
  * @returns
  * value associated with the arg
+ * or null if args is empty
  * or null if argName is not present in args
  * or null if arg value is undefined or null
  */
@@ -75,7 +74,8 @@ export const argValue = (args: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alp
  * @param providerInfo metric provider object
  * @returns first key in the provider object
  */
-const metricProvider = (providerInfo: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider): string => Object.keys(providerInfo)?.[0] ?? 'unsupported provider';
+export const metricProvider = (providerInfo: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider): string =>
+    Object.keys(providerInfo)?.[0] ?? 'unsupported provider';
 
 const PROVIDER_CONDITION_SUPPORT: {
     [key: string]: (resultAccessor: string) => {
@@ -137,7 +137,7 @@ export const conditionDetails = (
     thresholds: number[];
     conditionKeys: string[];
 } => {
-    if (condition === undefined || condition === '' || provider === undefined || metricProvider(provider) === undefined) {
+    if (condition === undefined || condition === '' || provider === undefined || metricProvider(provider) === 'unsupported provider') {
         return {
             label: null,
             thresholds: [],
@@ -175,7 +175,7 @@ export const conditionDetails = (
     return {
         label: interpolatedCondition,
         thresholds,
-        conditionKeys,
+        conditionKeys: [...new Set(conditionKeys)],
     };
 };
 
@@ -189,13 +189,17 @@ export const formatThresholdsForChart = (thresholds: number[]): (number | null)[
 /**
  *
  * @param valueMax max value for a measurement
- * @param failThreshold fail thresholds for the metric
- * @param successThreshold success thresholds for the metric
+ * @param failThresholds fail thresholds for the metric
+ * @param successThresholds success thresholds for the metric
  * @returns 120% of the max content value which could either be a data point or one of the thresholds
+ * or 1 if the max value is less than 1 and there are no thresholds
  */
-export const chartMax = (valueMax: number, failThreshold: number[] | null, successThreshold: number[] | null) => {
-    const failThresholdMax = failThreshold !== null && failThreshold.length > 0 ? Math.max(...failThreshold) : Number.NEGATIVE_INFINITY;
-    const successThresholdMax = successThreshold !== null && successThreshold.length > 0 ? Math.max(...successThreshold) : Number.NEGATIVE_INFINITY;
+export const chartMax = (valueMax: number, failThresholds: number[] | null, successThresholds: number[] | null) => {
+    if (valueMax < 1 && failThresholds === null && successThresholds === null) {
+        return 1;
+    }
+    const failThresholdMax = failThresholds !== null && failThresholds.length > 0 ? Math.max(...failThresholds) : Number.NEGATIVE_INFINITY;
+    const successThresholdMax = successThresholds !== null && successThresholds.length > 0 ? Math.max(...successThresholds) : Number.NEGATIVE_INFINITY;
     return roundNumber(Math.max(valueMax, failThresholdMax, successThresholdMax) * 1.2);
 };
 
@@ -373,19 +377,15 @@ export const printableDatadogQuery = (
     }
     if ((datadog.apiVersion ?? '').toLowerCase() === 'v2') {
         if ('query' in datadog) {
-            return 'formula' in datadog
-                ? [
-                      `query: ${datadog.query}, 
-                    formula: ${datadog.formula}`,
-                  ]
-                : [interpolateQuery(datadog.query, args)];
+            return 'formula' in datadog ? [`query: ${interpolateQuery(datadog.query, args)}, formula: ${datadog.formula}`] : [interpolateQuery(datadog.query, args)];
         }
         if ('queries' in datadog) {
-            return 'fomula' in datadog
-                ? [
-                      `queries: ${JSON.stringify(datadog.queries)}, 
-                    formula: ${datadog.formula}`,
-                  ]
+            let interpolatedQueries: {[key: string]: string} = {};
+            Object.keys(datadog.queries).forEach((queryKey) => {
+                interpolatedQueries[queryKey] = interpolateQuery(datadog.queries[queryKey], args);
+            });
+            return 'formula' in datadog
+                ? [`queries: ${JSON.stringify(interpolatedQueries)}, formula: ${datadog.formula}`]
                 : Object.values(datadog.queries).map((query) => interpolateQuery(query, args));
         }
     }
@@ -488,7 +488,7 @@ export const transformMeasurements = (conditionKeys: string[], measurements?: Gi
  * @param value value to check for chartability
  * @returns whether the data point can be added to a line chart (number or null)
  */
-const isChartable = (value: any): boolean => isFiniteNumber(value) || value === null;
+export const isChartable = (value: any): boolean => isFiniteNumber(value) || value === null;
 
 type FormattedMeasurementValue = number | string | null;
 
@@ -497,7 +497,7 @@ type FormattedMeasurementValue = number | string | null;
  * @param value value to display
  * @returns value formatted for display purposes
  */
-const formattedValue = (value: any): FormattedMeasurementValue => {
+export const formattedValue = (value: any): FormattedMeasurementValue => {
     const isNum = isFiniteNumber(value);
     return isNum ? roundNumber(Number(value)) : value?.toString() ?? null;
 };
@@ -522,11 +522,11 @@ const formatNumberMeasurement = (value: number): MeasurementValueInfo => {
  * @param accessor key by which to access measurement value
  * @returns information about displaying the measurement value
  */
-const formatSingleItemArrayMeasurement = (value: FormattedMeasurementValue[], accessor: number): MeasurementValueInfo => {
+export const formatSingleItemArrayMeasurement = (value: FormattedMeasurementValue[], accessor: number): MeasurementValueInfo => {
     if (isFiniteNumber(accessor)) {
         const measurementValue = value?.[accessor] ?? null;
-        // if it's a number, string, or null, chart it
-        if (isFiniteNumber(measurementValue) || typeof measurementValue === 'string' || measurementValue === null) {
+        // if it's a number or null, chart it
+        if (isFiniteNumber(measurementValue) || measurementValue === null) {
             const displayValue = formattedValue(measurementValue);
             return {
                 canChart: isChartable(measurementValue),
@@ -548,16 +548,23 @@ const formatSingleItemArrayMeasurement = (value: FormattedMeasurementValue[], ac
 
 /**
  *
- * @param value measurement value array (examples: [4,6,3,5] or [4,6,null,5] or [4,6,'a string',5] or [{anything: else},2,4,5]
+ * @param value measurement value array (examples: [4,6,3,5] or [4,6,null,5] or [4,6,'a string',5])
  * @returns information about displaying the measurement value (charts a chartable first value, shows stringified value in table))
  */
-const formatMultiItemArrayMeasurement = (value: FormattedMeasurementValue[]): MeasurementValueInfo => {
+export const formatMultiItemArrayMeasurement = (value: FormattedMeasurementValue[]): MeasurementValueInfo => {
+    if (value.length === 0) {
+        return {
+            canChart: false,
+            tableValue: '',
+        };
+    }
+
     const firstMeasurementValue = value[0];
     const canChartFirstValue = isChartable(firstMeasurementValue);
     return {
         canChart: canChartFirstValue,
         ...(canChartFirstValue && {chartValue: formattedValue(firstMeasurementValue)}),
-        tableValue: value.toString(),
+        tableValue: value.map((v) => String(v)).toString(),
     };
 };
 
@@ -567,7 +574,7 @@ const formatMultiItemArrayMeasurement = (value: FormattedMeasurementValue[]): Me
  * @param accessors keys by which to access measurement values
  * @returns information about displaying the measurement value (returns TransformedObjectValue))
  */
-const formatKeyValueMeasurement = (value: {[key: string]: FormattedMeasurementValue}, accessors: string[]): MeasurementValueInfo => {
+export const formatKeyValueMeasurement = (value: {[key: string]: FormattedMeasurementValue}, accessors: string[]): MeasurementValueInfo => {
     const transformedValue: TransformedValueObject = {};
     let canChart = true;
     accessors.forEach((accessor) => {
