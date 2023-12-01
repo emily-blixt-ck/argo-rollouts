@@ -415,7 +415,7 @@ describe('analysis modal transforms', () => {
     });
     test('printableDataDogQuery() with v2 queries and formula', () => {
         expect(printableDatadogQuery(MOCK_PROVIDER_DATADOG_V2_2.datadog, MOCK_ARGS_DATADOG)).toStrictEqual([
-            `queries: {\"a\":\"sum:requests.errors{service:istio-host-split-canary}.as_count()\",\"b\":\"sum:requests{service:istio-host-split-canary}.as_count()\"}, formula: moving_rollup(a, 60, 'sum') / b`,
+            `queries: {"a":"sum:requests.errors{service:istio-host-split-canary}.as_count()","b":"sum:requests{service:istio-host-split-canary}.as_count()"}, formula: moving_rollup(a, 60, 'sum') / b`,
         ]);
     });
 
