@@ -84,7 +84,7 @@ const MOCK_ARGS: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1Argument[] 
 
 const MOCK_PROVIDER_PROMETHEUS: GithubComArgoprojArgoRolloutsPkgApisRolloutsV1alpha1MetricProvider = {
     prometheus: {
-        address: 'http://prometheus-k8s.monitoring:9090',
+        address: 'https://prometheus-k8s.monitoring:9090',
         query: 'sum(irate(istio_requests_total{destination_service_name=~"{{args.service-name}}",response_code!~"5.*"}[1m])) \n/\nsum(irate(istio_requests_total{destination_service_name=~"{{args.service-name}}"}[1m]))',
     },
 };
