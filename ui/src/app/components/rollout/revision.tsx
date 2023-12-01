@@ -69,7 +69,8 @@ export const RevisionWidget = ({current, initCollapsed, revision, rollback}: Rev
                             onClick={() => rollback(Number(revision.number))}
                             type='default'
                             icon={<FontAwesomeIcon icon={faUndoAlt} style={{marginRight: '5px'}} />}
-                            style={{fontSize: '13px', marginRight: '10px'}}>
+                            style={{fontSize: '13px', marginRight: '10px'}}
+                        >
                             Rollback
                         </ConfirmButton>
                     )}
