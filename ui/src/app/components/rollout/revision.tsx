@@ -8,11 +8,15 @@ import '../pods/pods.scss';
 import {ConfirmButton} from '../confirm-button/confirm-button';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {faChevronCircleDown, faChevronCircleUp, faUndoAlt} from '@fortawesome/free-solid-svg-icons';
-import {Button, Tooltip} from 'antd';
+import {Button, Space, Tooltip, Typography} from 'antd';
 import {InfoItemProps, InfoItemRow} from '../info-item/info-item';
 import {AnalysisModal} from '../analysis-modal';
+import StatusIndicator from '../analysis-modal/status-indicator/status-indicator';
+import {AnalysisStatus} from '../analysis-modal/types';
 
 import moment = require('moment');
+
+const {Text} = Typography;
 
 function formatTimestamp(ts: string): string {
     const inputFormat = 'YYYY-MM-DD HH:mm:ss Z z';
@@ -69,8 +73,7 @@ export const RevisionWidget = ({current, initCollapsed, revision, rollback}: Rev
                             onClick={() => rollback(Number(revision.number))}
                             type='default'
                             icon={<FontAwesomeIcon icon={faUndoAlt} style={{marginRight: '5px'}} />}
-                            style={{fontSize: '13px', marginRight: '10px'}}
-                        >
+                            style={{fontSize: '13px', marginRight: '10px'}}>
                             Rollback
                         </ConfirmButton>
                     )}
@@ -138,7 +141,10 @@ const AnalysisRunWidget = ({analysisRuns, images, revision}: AnalysisRunWidgetPr
                                 ar.status === 'Running' ? 'analysis--pending' : ar.status === 'Successful' ? 'analysis--success' : 'analysis--failure'
                             }`}>
                             <Button onClick={() => (selectedAnalysis?.objectMeta.name === ar.objectMeta.name ? setSelectedAnalysis(null) : setSelectedAnalysis(ar))}>
-                                {analysisName(ar)}
+                                <Space size='small'>
+                                    <StatusIndicator size='small' status={ar.status as AnalysisStatus} />
+                                    <Text>{analysisName(ar)}</Text>
+                                </Space>
                             </Button>
                         </div>
                     </Tooltip>
